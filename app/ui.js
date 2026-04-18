@@ -173,6 +173,8 @@ const UI = {
         UI.initSetting('quality', 6);
         UI.initSetting('compression', 2);
         UI.initSetting('decoder', 'js');
+        UI.initSetting('fps', 60);
+        UI.initSetting('transport', 'websocket');
         UI.initSetting('shared', true);
         UI.initSetting('view_only', false);
         UI.initSetting('show_dot', false);
@@ -388,6 +390,9 @@ const UI = {
         UI.addSettingChangeHandler('compression');
         UI.addSettingChangeHandler('compression', UI.updateCompression);
         UI.addSettingChangeHandler('decoder');
+        UI.addSettingChangeHandler('fps');
+        UI.addSettingChangeHandler('fps', UI.updateFPS);
+        UI.addSettingChangeHandler('transport');
         UI.addSettingChangeHandler('view_clip');
         UI.addSettingChangeHandler('view_clip', UI.updateViewClip);
         UI.addSettingChangeHandler('shared');
@@ -1864,6 +1869,15 @@ const UI = {
         if (!UI.rfb) return;
 
         UI.rfb.compressionLevel = parseInt(UI.getSetting('compression'));
+    },
+
+    updateFPS() {
+        const fps = parseInt(UI.getSetting('fps'));
+        
+        if (UI.rfb && UI.rfb._frameRateLimiter) {
+            UI.rfb._frameRateLimiter.setMaxFPS(fps);
+            Log.Info(`FPS limit updated to ${fps}`);
+        }
     },
 
 /* ------^-------
