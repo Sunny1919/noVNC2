@@ -2218,6 +2218,9 @@ export default class RFB extends EventTargetMixin {
     _sendEncodings() {
         const encs = [];
 
+        // Check if using WASM decoder
+        const useWASM = this._wasmDecoderReady;
+
         // In preference order
         encs.push(encodings.encodingCopyRect);
         // Only supported with full depth support
@@ -2225,7 +2228,13 @@ export default class RFB extends EventTargetMixin {
             encs.push(encodings.encodingTight);
             encs.push(encodings.encodingTightPNG);
             encs.push(encodings.encodingZRLE);
-            encs.push(encodings.encodingJPEG);
+            
+            // IMPORTANT: Don't advertise JPEG when using WASM
+            // WASM uses Raw/RRE/Hextile which are faster and use less memory
+            if (!useWASM) {
+                encs.push(encodings.encodingJPEG);
+            }
+            
             encs.push(encodings.encodingHextile);
             encs.push(encodings.encodingRRE);
         }
@@ -2253,6 +2262,11 @@ export default class RFB extends EventTargetMixin {
         }
 
         RFB.messages.clientEncodings(this._sock, encs);
+        
+        // Log encoding preference
+        if (useWASM) {
+            Log.Info('Using WASM decoder - JPEG disabled, preferring Raw/RRE/Hextile');
+        }
     }
 
     /* RFB protocol initialization states:
