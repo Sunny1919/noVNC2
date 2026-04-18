@@ -172,6 +172,7 @@ const UI = {
         UI.initSetting('resize', 'off');
         UI.initSetting('quality', 6);
         UI.initSetting('compression', 2);
+        UI.initSetting('decoder', 'js');
         UI.initSetting('shared', true);
         UI.initSetting('view_only', false);
         UI.initSetting('show_dot', false);
@@ -386,6 +387,7 @@ const UI = {
         UI.addSettingChangeHandler('quality', UI.updateQuality);
         UI.addSettingChangeHandler('compression');
         UI.addSettingChangeHandler('compression', UI.updateCompression);
+        UI.addSettingChangeHandler('decoder');
         UI.addSettingChangeHandler('view_clip');
         UI.addSettingChangeHandler('view_clip', UI.updateViewClip);
         UI.addSettingChangeHandler('shared');
@@ -1020,9 +1022,6 @@ const UI = {
         const clipboardText = e.detail.text;
         document.getElementById('noVNC_clipboard_text').value = clipboardText;
         
-        // Save to clipboard history
-        UI.saveToClipboardHistory(clipboardText, 'server');
-        
         // Tự động đồng bộ vào clipboard của trình duyệt
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(clipboardText)
@@ -1249,10 +1248,8 @@ const UI = {
 
         if (enable) {
             UI.bandwidthAdapter.enable();
-            UI.networkIndicator.show();
         } else {
             UI.bandwidthAdapter.disable();
-            UI.networkIndicator.hide();
         }
     },
 
@@ -1554,10 +1551,9 @@ const UI = {
         // Bật tự động đồng bộ clipboard
         UI.setupAutomaticClipboardSync();
         
-        // Bật bandwidth adaptation
+        // Set RFB reference for bandwidth adapter (but don't auto-enable)
         if (UI.bandwidthAdapter) {
             UI.bandwidthAdapter.rfb = UI.rfb;
-            UI.toggleBandwidthAdaptation(true);
         }
 
         // Do this last because it can only be used on rendered elements
@@ -2157,6 +2153,7 @@ const UI = {
     toggleAudioEnable(e) {
         const enabled = e.target.checked;
         const statusEl = document.getElementById('noVNC_audio_status');
+        const audioBtn = document.getElementById('noVNC_audio_button');
         
         if (!UI.rfb) {
             statusEl.textContent = 'Status: Not connected';
@@ -2174,10 +2171,12 @@ const UI = {
             );
             statusEl.textContent = 'Status: Enabled';
             statusEl.style.color = '#4CAF50';
+            if (audioBtn) audioBtn.classList.add('noVNC_selected');
         } else {
             UI.rfb.disableAudio();
             statusEl.textContent = 'Status: Disabled';
             statusEl.style.color = '#666';
+            if (audioBtn) audioBtn.classList.remove('noVNC_selected');
         }
     },
 
@@ -2204,7 +2203,7 @@ const UI = {
         document.getElementById('noVNC_network')
             .classList.add("noVNC_open");
         
-        // Start monitoring if not already started
+        // Start monitoring when panel opens
         if (UI.bandwidthAdapter && !UI.bandwidthAdapter.monitor.isMonitoring) {
             UI.bandwidthAdapter.monitor.start();
         }
@@ -2213,6 +2212,14 @@ const UI = {
     closeNetworkPanel() {
         document.getElementById('noVNC_network')
             .classList.remove("noVNC_open");
+        
+        // Stop monitoring when panel closes (unless auto-adapt is enabled)
+        const autoAdaptCheckbox = document.getElementById('noVNC_network_adapt');
+        if (UI.bandwidthAdapter && 
+            UI.bandwidthAdapter.monitor.isMonitoring && 
+            (!autoAdaptCheckbox || !autoAdaptCheckbox.checked)) {
+            UI.bandwidthAdapter.monitor.stop();
+        }
     },
 
     toggleNetworkAdapt(e) {
@@ -2225,8 +2232,17 @@ const UI = {
 
         if (enabled) {
             UI.bandwidthAdapter.enable();
+            // Start monitoring if not already started
+            if (!UI.bandwidthAdapter.monitor.isMonitoring) {
+                UI.bandwidthAdapter.monitor.start();
+            }
         } else {
             UI.bandwidthAdapter.disable();
+            // Stop monitoring if panel is closed
+            const networkPanel = document.getElementById('noVNC_network');
+            if (!networkPanel || !networkPanel.classList.contains('noVNC_open')) {
+                UI.bandwidthAdapter.monitor.stop();
+            }
         }
     },
 
