@@ -260,7 +260,7 @@ export default class RFB extends EventTargetMixin {
         this._decoders[encodings.encodingZRLE] = new ZRLEDecoder();
         
         // JPEG decoder with frame rate limiting
-        this._frameRateLimiter = getFrameRateLimiter(30); // 30 FPS max
+        this._frameRateLimiter = getFrameRateLimiter(60); // 60 FPS max (configurable)
         const baseJPEGDecoder = new JPEGDecoder();
         this._decoders[encodings.encodingJPEG] = new ThrottledJPEGDecoder(
             baseJPEGDecoder, 
