@@ -240,6 +240,21 @@
                                     <option value="wasm">WebAssembly (Faster)</option>
                                 </select>
                             </li>
+                            <li>
+                                <label for="noVNC_setting_fps">Max FPS:</label>
+                                <select id="noVNC_setting_fps" name="vncFPS">
+                                    <option value="30">30 FPS (Balanced)</option>
+                                    <option value="60" selected>60 FPS (Smooth)</option>
+                                    <option value="120">120 FPS (Ultra)</option>
+                                </select>
+                            </li>
+                            <li>
+                                <label for="noVNC_setting_transport">Transport:</label>
+                                <select id="noVNC_setting_transport" name="vncTransport">
+                                    <option value="websocket" selected>WebSocket (Default)</option>
+                                    <option value="webrtc">WebRTC (Low Latency)</option>
+                                </select>
+                            </li>
                             <li><hr></li>
                             <li>
                                 <label for="noVNC_setting_repeaterID">Repeater ID:</label>
