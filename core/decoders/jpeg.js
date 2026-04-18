@@ -15,6 +15,10 @@ export default class JPEGDecoder {
         this._cachedHuffmanTables = [];
 
         this._segments = [];
+        
+        // Memory leak prevention
+        this._frameCount = 0;
+        this._maxCacheSize = 10; // Limit cache size
     }
 
     decodeRect(x, y, width, height, sock, display, depth) {
@@ -74,14 +78,37 @@ export default class JPEGDecoder {
 
         display.imageRect(x, y, width, height, "image/jpeg", data);
 
+        // Update caches with size limit to prevent memory leak
         if (huffmanTables.length !== 0) {
             this._cachedHuffmanTables = huffmanTables;
+            // Limit cache size
+            if (this._cachedHuffmanTables.length > this._maxCacheSize) {
+                this._cachedHuffmanTables = this._cachedHuffmanTables.slice(-this._maxCacheSize);
+            }
         }
         if (quantTables.length !== 0) {
             this._cachedQuantTables = quantTables;
+            // Limit cache size
+            if (this._cachedQuantTables.length > this._maxCacheSize) {
+                this._cachedQuantTables = this._cachedQuantTables.slice(-this._maxCacheSize);
+            }
         }
 
+        // Clear segments array to free memory
         this._segments = [];
+        
+        // Periodic cache cleanup to prevent memory leak
+        this._frameCount++;
+        if (this._frameCount % 100 === 0) {
+            // Every 100 frames, clear old caches
+            this._cachedQuantTables = [];
+            this._cachedHuffmanTables = [];
+            
+            // Suggest garbage collection (hint only, browser decides)
+            if (typeof window !== 'undefined' && window.gc) {
+                window.gc();
+            }
+        }
 
         return true;
     }
