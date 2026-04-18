@@ -390,6 +390,7 @@ const UI = {
         UI.addSettingChangeHandler('compression');
         UI.addSettingChangeHandler('compression', UI.updateCompression);
         UI.addSettingChangeHandler('decoder');
+        UI.addSettingChangeHandler('decoder', UI.updateDecoder);
         UI.addSettingChangeHandler('fps');
         UI.addSettingChangeHandler('fps', UI.updateFPS);
         UI.addSettingChangeHandler('transport');
@@ -1877,6 +1878,36 @@ const UI = {
         if (UI.rfb && UI.rfb._frameRateLimiter) {
             UI.rfb._frameRateLimiter.setMaxFPS(fps);
             Log.Info(`FPS limit updated to ${fps}`);
+        }
+    },
+
+    updateDecoder() {
+        const decoder = UI.getSetting('decoder');
+        
+        if (!UI.rfb) {
+            return;
+        }
+
+        // Update WASM ready flag based on decoder setting
+        if (decoder === 'wasm') {
+            // Check if WASM is actually loaded
+            if (UI.rfb._wasmDecoder && UI.rfb._wasmDecoder.isReady) {
+                UI.rfb._wasmDecoderReady = true;
+                Log.Info('WASM decoder enabled');
+            } else {
+                Log.Warn('WASM decoder selected but not available, using JS');
+                UI.rfb._wasmDecoderReady = false;
+            }
+        } else {
+            UI.rfb._wasmDecoderReady = false;
+            Log.Info('JavaScript decoder enabled');
+        }
+
+        // Resend encodings to server
+        if (UI.rfb._rfbConnectionState === 'connected') {
+            UI.rfb._sendEncodings();
+            Log.Info('Encoding preferences updated, reconnect recommended for best results');
+            UI.showStatus(_("Decoder changed. Reconnect for best results."), 'normal', 3000);
         }
     },
 
