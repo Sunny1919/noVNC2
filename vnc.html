@@ -93,9 +93,33 @@
             </div>
 
             <!-- Audio -->
-            <input type="image" alt="Toggle Audio" src="app/images/audio.svg"
+            <input type="image" alt="Audio" src="app/images/audio.svg"
                 id="noVNC_audio_button" class="noVNC_button noVNC_hidden"
-                title="Toggle Audio">
+                title="Audio">
+            <div class="noVNC_vcenter">
+            <div id="noVNC_audio" class="noVNC_panel">
+                <div class="noVNC_heading">
+                    <img alt="" src="app/images/audio.svg"> Audio
+                </div>
+                <p class="noVNC_subheading">
+                    Control audio streaming from server.
+                </p>
+                <div style="padding: 10px 0;">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="noVNC_audio_enable" style="width: auto;">
+                        <span>Enable Audio</span>
+                    </label>
+                </div>
+                <div style="padding: 10px 0;">
+                    <label for="noVNC_audio_volume">Volume:</label>
+                    <input id="noVNC_audio_volume" type="range" min="0" max="100" value="100" style="width: 100%;">
+                    <span id="noVNC_audio_volume_label">100%</span>
+                </div>
+                <div id="noVNC_audio_status" style="padding: 10px 0; font-size: 12px; color: #666;">
+                    Status: Disabled
+                </div>
+            </div>
+            </div>
 
             <!-- Shutdown/Reboot -->
             <input type="image" alt="Shutdown/Reboot" src="app/images/power.svg"
@@ -125,6 +149,41 @@
                     Edit clipboard content in the textarea below.
                 </p>
                 <textarea id="noVNC_clipboard_text" rows=5></textarea>
+            </div>
+            </div>
+
+            <!-- Network Quality -->
+            <input type="image" alt="Network" src="app/images/info.svg"
+                id="noVNC_network_button" class="noVNC_button"
+                title="Network Quality">
+            <div class="noVNC_vcenter">
+            <div id="noVNC_network" class="noVNC_panel">
+                <div class="noVNC_heading">
+                    <img alt="" src="app/images/info.svg"> Network Quality
+                </div>
+                <p class="noVNC_subheading">
+                    Real-time network performance monitoring.
+                </p>
+                <div style="padding: 10px 0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span>Bandwidth:</span>
+                        <span id="noVNC_network_bandwidth" style="font-weight: bold;">-- Mbps</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span>Latency:</span>
+                        <span id="noVNC_network_latency" style="font-weight: bold;">-- ms</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span>Quality:</span>
+                        <span id="noVNC_network_quality" style="font-weight: bold; text-transform: uppercase;">--</span>
+                    </div>
+                </div>
+                <div style="padding: 10px 0;">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="noVNC_network_adapt" style="width: auto;">
+                        <span>Auto-adapt Quality</span>
+                    </label>
+                </div>
             </div>
             </div>
 
