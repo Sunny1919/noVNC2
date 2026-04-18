@@ -12,7 +12,7 @@
 import * as Log from './util/logging.js';
 
 export class FrameRateLimiter {
-    constructor(maxFPS = 30) {
+    constructor(maxFPS = 40) {
         this.maxFPS = maxFPS;
         this.minFrameInterval = 1000 / maxFPS;
         this.lastFrameTime = 0;
@@ -124,17 +124,27 @@ export class ThrottledJPEGDecoder {
         this.limiter = limiter;
     }
 
-    async decodeRect(x, y, width, height, sock, display, depth) {
+    decodeRect(x, y, width, height, sock, display, depth) {
         // Check if we should process this frame
         if (!this.limiter.shouldProcessFrame()) {
             // Skip this frame - just consume the data without decoding
             return this._skipFrame(sock);
         }
 
-        // Throttle the decode request
-        return await this.limiter.throttleRequest(async () => {
-            return this.baseDecoder.decodeRect(x, y, width, height, sock, display, depth);
-        });
+        // Check concurrent request limit
+        if (this.limiter.activeRequests >= this.limiter.maxConcurrentRequests) {
+            // Too many active requests, skip this frame
+            return this._skipFrame(sock);
+        }
+
+        // Process the frame
+        this.limiter.activeRequests++;
+        try {
+            const result = this.baseDecoder.decodeRect(x, y, width, height, sock, display, depth);
+            return result;
+        } finally {
+            this.limiter.activeRequests--;
+        }
     }
 
     _skipFrame(sock) {
