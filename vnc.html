@@ -104,6 +104,9 @@
                 <p class="noVNC_subheading">
                     Control audio streaming from server.
                 </p>
+                <div id="noVNC_audio_server_support" style="padding: 10px 0; font-size: 12px; color: #666;">
+                    Server support: Checking...
+                </div>
                 <div style="padding: 10px 0;">
                     <label style="display: flex; align-items: center; gap: 8px;">
                         <input type="checkbox" id="noVNC_audio_enable" style="width: auto;">
@@ -149,6 +152,37 @@
                     Edit clipboard content in the textarea below.
                 </p>
                 <textarea id="noVNC_clipboard_text" rows=5></textarea>
+            </div>
+            </div>
+
+            <!-- Screenshot -->
+            <input type="image" alt="Screenshot" src="app/images/info.svg"
+                id="noVNC_screenshot_button" class="noVNC_button"
+                title="Take Screenshot">
+
+            <!-- Recorder -->
+            <input type="image" alt="Record" src="app/images/info.svg"
+                id="noVNC_record_button" class="noVNC_button"
+                title="Record Session">
+            <div class="noVNC_vcenter">
+            <div id="noVNC_recorder" class="noVNC_panel">
+                <div class="noVNC_heading">
+                    <img alt="" src="app/images/info.svg"> Session Recorder
+                </div>
+                <p class="noVNC_subheading">
+                    Record your VNC session for playback.
+                </p>
+                <div style="padding: 10px 0;">
+                    <div id="noVNC_recorder_status" style="margin-bottom: 10px; font-weight: bold;">
+                        Status: <span id="noVNC_recorder_status_text">Ready</span>
+                    </div>
+                    <div id="noVNC_recorder_time" style="margin-bottom: 10px; display: none;">
+                        Duration: <span id="noVNC_recorder_time_text">00:00</span>
+                    </div>
+                    <input type="button" id="noVNC_recorder_start" value="Start Recording" style="margin-right: 5px;">
+                    <input type="button" id="noVNC_recorder_stop" value="Stop" style="display: none;">
+                    <input type="button" id="noVNC_recorder_download" value="Download" style="display: none;">
+                </div>
             </div>
             </div>
 
@@ -254,6 +288,19 @@
                                     <option value="websocket" selected>WebSocket (Default)</option>
                                     <option value="webrtc">WebRTC (Low Latency)</option>
                                 </select>
+                            </li>
+                            <li><hr></li>
+                            <li>
+                                <label for="noVNC_setting_upscaling">Video Upscaling:</label>
+                                <select id="noVNC_setting_upscaling" name="vncUpscaling">
+                                    <option value="none" selected>None (Default)</option>
+                                    <option value="bilinear">Bilinear (Fast)</option>
+                                    <option value="bicubic">Bicubic (Quality)</option>
+                                    <option value="fsr">FSR (Best)</option>
+                                </select>
+                            </li>
+                            <li>
+                                <label><input id="noVNC_setting_gpu_render" type="checkbox"> GPU Rendering (WebGPU)</label>
                             </li>
                             <li><hr></li>
                             <li>
