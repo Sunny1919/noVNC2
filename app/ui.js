@@ -107,12 +107,13 @@ const UI = {
         UI.addMachineHandlers();
         UI.addConnectionControlHandlers();
         UI.addClipboardHandlers();
+        UI.addAudioHandlers();
+        UI.addNetworkHandlers();
         UI.addRecordingHandlers();
         UI.addSettingsHandlers();
         
         // Initialize new features
         UI.initBandwidthAdapter();
-        UI.initClipboardHistory();
         UI.initAudioStream();
         UI.initFrameScheduler();
         document.getElementById("noVNC_status")
@@ -226,8 +227,6 @@ const UI = {
         document.getElementById("noVNC_view_drag_button")
             .addEventListener('click', UI.toggleViewDrag);
 
-        document.getElementById("noVNC_audio_button")
-            .addEventListener('click', UI.toggleEnableAudio);
         document.getElementById("noVNC_control_bar_handle")
             .addEventListener('mousedown', UI.controlbarHandleMouseDown);
         document.getElementById("noVNC_control_bar_handle")
@@ -347,6 +346,22 @@ const UI = {
             .addEventListener('click', UI.toggleClipboardPanel);
         document.getElementById("noVNC_clipboard_text")
             .addEventListener('change', UI.clipboardSend);
+    },
+
+    addAudioHandlers() {
+        document.getElementById("noVNC_audio_button")
+            .addEventListener('click', UI.toggleAudioPanel);
+        document.getElementById("noVNC_audio_enable")
+            .addEventListener('change', UI.toggleAudioEnable);
+        document.getElementById("noVNC_audio_volume")
+            .addEventListener('input', UI.updateAudioVolume);
+    },
+
+    addNetworkHandlers() {
+        document.getElementById("noVNC_network_button")
+            .addEventListener('click', UI.toggleNetworkPanel);
+        document.getElementById("noVNC_network_adapt")
+            .addEventListener('change', UI.toggleNetworkAdapt);
     },
 
     // Add a call to save settings when the element changes,
@@ -852,6 +867,8 @@ const UI = {
         UI.closeSettingsPanel();
         UI.closePowerPanel();
         UI.closeClipboardPanel();
+        UI.closeAudioPanel();
+        UI.closeNetworkPanel();
         UI.closeExtraKeys();
     },
 
@@ -1206,16 +1223,15 @@ const UI = {
     // Initialize bandwidth adapter
     async initBandwidthAdapter() {
         try {
-            const { BandwidthAdapter, NetworkQualityIndicator } = 
+            const { BandwidthAdapter } = 
                 await import('../core/bandwidth-adapter.js');
             
             UI.bandwidthAdapter = new BandwidthAdapter(null); // RFB will be set on connect
-            UI.networkIndicator = new NetworkQualityIndicator(document.body);
             
             // Listen to bandwidth changes
             if (UI.bandwidthAdapter.monitor) {
                 UI.bandwidthAdapter.monitor.addListener((stats) => {
-                    UI.networkIndicator.update(stats);
+                    UI.updateNetworkStats(stats);
                 });
             }
             
@@ -1242,50 +1258,6 @@ const UI = {
 
 /* ------^-------
  *  /BANDWIDTH ADAPTATION
- * ==============
- *  CLIPBOARD HISTORY
- * ------v------*/
-
-    // Initialize clipboard history
-    async initClipboardHistory() {
-        try {
-            const { ClipboardHistory, ClipboardHistoryUI } = 
-                await import('../core/clipboard-history.js');
-            
-            UI.clipboardHistory = new ClipboardHistory(20);
-            UI.clipboardHistoryUI = new ClipboardHistoryUI(UI.clipboardHistory);
-            
-            // Add button to control bar
-            const historyBtn = document.createElement('button');
-            historyBtn.id = 'noVNC_clipboard_history_button';
-            historyBtn.className = 'noVNC_button';
-            historyBtn.title = 'Clipboard History';
-            historyBtn.textContent = '📋';
-            historyBtn.addEventListener('click', () => {
-                UI.clipboardHistoryUI.toggle();
-            });
-            
-            // Insert after clipboard button
-            const clipboardBtn = document.getElementById('noVNC_clipboard_button');
-            if (clipboardBtn && clipboardBtn.parentNode) {
-                clipboardBtn.parentNode.insertBefore(historyBtn, clipboardBtn.nextSibling);
-            }
-            
-            Log.Info('Clipboard history initialized');
-        } catch (err) {
-            Log.Error('Failed to initialize clipboard history:', err);
-        }
-    },
-
-    // Save to clipboard history
-    saveToClipboardHistory(text, source) {
-        if (UI.clipboardHistory) {
-            UI.clipboardHistory.add(text, source);
-        }
-    },
-
-/* ------^-------
- *  /CLIPBOARD HISTORY
  * ==============
  *  AUDIO STREAM
  * ------v------*/
@@ -2162,11 +2134,37 @@ const UI = {
         UI.idleControlbar();
     },
 
-    toggleEnableAudio() {
-        if (!UI.rfb) return;
+    toggleAudioPanel() {
+        // Close the description panel
+        UI.closeAllPanels();
+        // And open the audio panel
+        UI.openAudioPanel();
+    },
 
-        if (!document.getElementById('noVNC_audio_button')
-            .classList.contains("noVNC_selected")) {
+    openAudioPanel() {
+        UI.closeAllPanels();
+        UI.openControlbar();
+
+        document.getElementById('noVNC_audio')
+            .classList.add("noVNC_open");
+    },
+
+    closeAudioPanel() {
+        document.getElementById('noVNC_audio')
+            .classList.remove("noVNC_open");
+    },
+
+    toggleAudioEnable(e) {
+        const enabled = e.target.checked;
+        const statusEl = document.getElementById('noVNC_audio_status');
+        
+        if (!UI.rfb) {
+            statusEl.textContent = 'Status: Not connected';
+            e.target.checked = false;
+            return;
+        }
+
+        if (enabled) {
             UI.rfb.enableAudio(
                 2,
                 MediaSource.isTypeSupported('audio/webm;codecs=opus') ?
@@ -2174,13 +2172,81 @@ const UI = {
                     RFB.audioCodecs.MP3,
                 32 * 1024  // 32kbps
             );
-            document.getElementById('noVNC_audio_button')
-                .classList.add("noVNC_selected");
+            statusEl.textContent = 'Status: Enabled';
+            statusEl.style.color = '#4CAF50';
         } else {
             UI.rfb.disableAudio();
-            document.getElementById('noVNC_audio_button')
-                .classList.remove("noVNC_selected");
+            statusEl.textContent = 'Status: Disabled';
+            statusEl.style.color = '#666';
         }
+    },
+
+    updateAudioVolume(e) {
+        const volume = e.target.value;
+        document.getElementById('noVNC_audio_volume_label').textContent = volume + '%';
+        
+        if (UI.audioPlayer) {
+            UI.audioPlayer.setVolume(volume / 100);
+        }
+    },
+
+    toggleNetworkPanel() {
+        // Close other panels
+        UI.closeAllPanels();
+        // And open the network panel
+        UI.openNetworkPanel();
+    },
+
+    openNetworkPanel() {
+        UI.closeAllPanels();
+        UI.openControlbar();
+
+        document.getElementById('noVNC_network')
+            .classList.add("noVNC_open");
+        
+        // Start monitoring if not already started
+        if (UI.bandwidthAdapter && !UI.bandwidthAdapter.monitor.isMonitoring) {
+            UI.bandwidthAdapter.monitor.start();
+        }
+    },
+
+    closeNetworkPanel() {
+        document.getElementById('noVNC_network')
+            .classList.remove("noVNC_open");
+    },
+
+    toggleNetworkAdapt(e) {
+        const enabled = e.target.checked;
+        
+        if (!UI.bandwidthAdapter) {
+            e.target.checked = false;
+            return;
+        }
+
+        if (enabled) {
+            UI.bandwidthAdapter.enable();
+        } else {
+            UI.bandwidthAdapter.disable();
+        }
+    },
+
+    updateNetworkStats(stats) {
+        document.getElementById('noVNC_network_bandwidth').textContent = 
+            stats.bandwidth.toFixed(1) + ' Mbps';
+        document.getElementById('noVNC_network_latency').textContent = 
+            stats.latency.toFixed(0) + ' ms';
+        
+        const qualityEl = document.getElementById('noVNC_network_quality');
+        qualityEl.textContent = stats.quality;
+        
+        // Color code quality
+        const colors = {
+            excellent: '#4CAF50',
+            good: '#8BC34A',
+            fair: '#FFC107',
+            poor: '#F44336'
+        };
+        qualityEl.style.color = colors[stats.quality] || '#666';
     },
 /* ------^-------
  *   /EXTRA KEYS
