@@ -36,6 +36,7 @@ import TightDecoder from "./decoders/tight.js";
 import TightPNGDecoder from "./decoders/tightpng.js";
 import ZRLEDecoder from "./decoders/zrle.js";
 import JPEGDecoder from "./decoders/jpeg.js";
+import { getWasmDecoder } from "./wasm-decoder-wrapper.js";
 
 // How many seconds to wait for a disconnect to finish
 const DISCONNECT_TIMEOUT = 3;
@@ -257,6 +258,11 @@ export default class RFB extends EventTargetMixin {
         this._decoders[encodings.encodingTightPNG] = new TightPNGDecoder();
         this._decoders[encodings.encodingZRLE] = new ZRLEDecoder();
         this._decoders[encodings.encodingJPEG] = new JPEGDecoder();
+
+        // Initialize WASM decoder (async, will be ready later)
+        this._wasmDecoder = null;
+        this._wasmDecoderReady = false;
+        this._initWasmDecoder();
 
         // NB: nothing that needs explicit teardown should be done
         // before this point, since this can throw an exception
@@ -570,6 +576,23 @@ export default class RFB extends EventTargetMixin {
     }
 
     // ===== PRIVATE METHODS =====
+
+    async _initWasmDecoder() {
+        try {
+            this._wasmDecoder = getWasmDecoder();
+            const loaded = await this._wasmDecoder.load('./core/decoder.wasm');
+            
+            if (loaded) {
+                this._wasmDecoderReady = true;
+                Log.Info('WASM decoder initialized and ready');
+            } else {
+                Log.Warn('WASM decoder failed to load, using JS decoders');
+            }
+        } catch (err) {
+            Log.Warn('WASM decoder initialization failed:', err);
+            this._wasmDecoderReady = false;
+        }
+    }
 
     _connect() {
         Log.Debug(">> RFB.connect");
