@@ -48,6 +48,12 @@ export class GPURenderer {
 
             // Configure canvas context
             this._context = canvas.getContext('webgpu');
+            
+            if (!this._context) {
+                Log.Error('Failed to get WebGPU context from canvas');
+                return false;
+            }
+            
             const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
 
             this._context.configure({
