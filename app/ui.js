@@ -2157,6 +2157,19 @@ const UI = {
 
         document.getElementById('noVNC_audio')
             .classList.add("noVNC_open");
+        
+        // Update server support status
+        const supportEl = document.getElementById('noVNC_audio_server_support');
+        if (UI.rfb && UI.rfb.capabilities.audio) {
+            supportEl.textContent = 'Server support: ✓ Yes';
+            supportEl.style.color = '#4CAF50';
+        } else if (UI.rfb) {
+            supportEl.textContent = 'Server support: ✗ No (Replit Audio extension required)';
+            supportEl.style.color = '#F44336';
+        } else {
+            supportEl.textContent = 'Server support: Not connected';
+            supportEl.style.color = '#666';
+        }
     },
 
     closeAudioPanel() {
@@ -2175,22 +2188,50 @@ const UI = {
             return;
         }
 
+        // Check if server supports audio
+        if (!UI.rfb.capabilities.audio) {
+            statusEl.textContent = 'Status: Server does not support audio';
+            statusEl.style.color = '#F44336';
+            e.target.checked = false;
+            
+            // Show notification
+            UI.showStatus(_("Audio not supported by server"), 'warn', 3000);
+            return;
+        }
+
         if (enabled) {
-            UI.rfb.enableAudio(
-                2,
-                MediaSource.isTypeSupported('audio/webm;codecs=opus') ?
-                    RFB.audioCodecs.OpusWebM :
-                    RFB.audioCodecs.MP3,
-                32 * 1024  // 32kbps
-            );
-            statusEl.textContent = 'Status: Enabled';
-            statusEl.style.color = '#4CAF50';
-            if (audioBtn) audioBtn.classList.add('noVNC_selected');
+            try {
+                UI.rfb.enableAudio(
+                    2,
+                    MediaSource.isTypeSupported('audio/webm;codecs=opus') ?
+                        RFB.audioCodecs.OpusWebM :
+                        RFB.audioCodecs.MP3,
+                    32 * 1024  // 32kbps
+                );
+                statusEl.textContent = 'Status: Enabled';
+                statusEl.style.color = '#4CAF50';
+                if (audioBtn) audioBtn.classList.add('noVNC_selected');
+                
+                UI.showStatus(_("Audio enabled"), 'normal', 2000);
+            } catch (err) {
+                Log.Error('Failed to enable audio:', err);
+                statusEl.textContent = 'Status: Failed to enable';
+                statusEl.style.color = '#F44336';
+                e.target.checked = false;
+                
+                UI.showStatus(_("Failed to enable audio: ") + err.message, 'error');
+            }
         } else {
-            UI.rfb.disableAudio();
-            statusEl.textContent = 'Status: Disabled';
-            statusEl.style.color = '#666';
-            if (audioBtn) audioBtn.classList.remove('noVNC_selected');
+            try {
+                UI.rfb.disableAudio();
+                statusEl.textContent = 'Status: Disabled';
+                statusEl.style.color = '#666';
+                if (audioBtn) audioBtn.classList.remove('noVNC_selected');
+                
+                UI.showStatus(_("Audio disabled"), 'normal', 2000);
+            } catch (err) {
+                Log.Error('Failed to disable audio:', err);
+            }
         }
     },
 
