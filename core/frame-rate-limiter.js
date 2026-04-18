@@ -12,7 +12,7 @@
 import * as Log from './util/logging.js';
 
 export class FrameRateLimiter {
-    constructor(maxFPS = 40) {
+    constructor(maxFPS = 30) {
         this.maxFPS = maxFPS;
         this.minFrameInterval = 1000 / maxFPS;
         this.lastFrameTime = 0;
@@ -170,7 +170,7 @@ export class ThrottledJPEGDecoder {
                 }
                 
                 // No length markers
-                if (type >= 0xD0 && type <= 0xD9 || type == 0x01) {
+                if ((type >= 0xD0 && type <= 0xD8) || type == 0x01) {
                     continue;
                 }
 
@@ -189,6 +189,30 @@ export class ThrottledJPEGDecoder {
 
                 // Skip the segment data
                 sock.rQskipBytes(length - 2);
+                
+                // Handle start of scan (0xDA) - need to skip scan data
+                if (type === 0xDA) {
+                    // Skip until we find next marker (0xFF followed by non-0x00)
+                    while (true) {
+                        if (sock.rQwait("JPEG", 2)) {
+                            return false;
+                        }
+                        
+                        let byte1 = sock.rQshift8();
+                        if (byte1 === 0xFF) {
+                            let byte2 = sock.rQpeek8();
+                            if (byte2 !== 0x00 && !(byte2 >= 0xD0 && byte2 <= 0xD7)) {
+                                // Found next marker, put back the 0xFF
+                                sock.rQunshift8(byte1);
+                                break;
+                            }
+                            // Skip the 0x00 escape byte
+                            if (byte2 === 0x00) {
+                                sock.rQshift8();
+                            }
+                        }
+                    }
+                }
             }
         } catch (err) {
             Log.Warn('Error skipping JPEG frame:', err);
