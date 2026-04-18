@@ -35,7 +35,7 @@ export class BandwidthMonitor {
     }
 
     // Bắt đầu monitoring
-    start(interval = 5000) {
+    start(interval = 30000) { // Changed from 5000 to 30000 (30 seconds)
         if (this.isMonitoring) {
             return;
         }
