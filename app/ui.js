@@ -1961,18 +1961,26 @@ const UI = {
                 UI.gpuRenderer = getGPURenderer();
             }
 
-            if (UI.rfb && UI.rfb._canvas) {
-                const success = await UI.gpuRenderer.init(UI.rfb._canvas);
-                if (success) {
-                    Log.Info('GPU rendering enabled');
-                    UI.showStatus(_("GPU rendering enabled"), 'normal', 2000);
-                } else {
-                    Log.Warn('Failed to enable GPU rendering');
-                    UI.showStatus(_("GPU rendering not supported"), 'warn', 3000);
-                    // Uncheck the setting
-                    document.getElementById('noVNC_setting_gpu_render').checked = false;
-                    UI.saveSetting('gpu_render');
-                }
+            // Check if connected and canvas is available
+            if (!UI.rfb || !UI.rfb._canvas) {
+                Log.Warn('Cannot enable GPU rendering: Not connected or canvas not available');
+                UI.showStatus(_("Connect to VNC server first"), 'warn', 3000);
+                // Uncheck the setting
+                document.getElementById('noVNC_setting_gpu_render').checked = false;
+                UI.saveSetting('gpu_render');
+                return;
+            }
+
+            const success = await UI.gpuRenderer.init(UI.rfb._canvas);
+            if (success) {
+                Log.Info('GPU rendering enabled');
+                UI.showStatus(_("GPU rendering enabled"), 'normal', 2000);
+            } else {
+                Log.Warn('Failed to enable GPU rendering');
+                UI.showStatus(_("GPU rendering not supported"), 'warn', 3000);
+                // Uncheck the setting
+                document.getElementById('noVNC_setting_gpu_render').checked = false;
+                UI.saveSetting('gpu_render');
             }
         } else {
             if (UI.gpuRenderer) {
