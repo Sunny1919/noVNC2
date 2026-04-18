@@ -37,6 +37,7 @@ import TightPNGDecoder from "./decoders/tightpng.js";
 import ZRLEDecoder from "./decoders/zrle.js";
 import JPEGDecoder from "./decoders/jpeg.js";
 import { getWasmDecoder } from "./wasm-decoder-wrapper.js";
+import { getFrameRateLimiter, ThrottledJPEGDecoder } from "./frame-rate-limiter.js";
 
 // How many seconds to wait for a disconnect to finish
 const DISCONNECT_TIMEOUT = 3;
@@ -257,7 +258,14 @@ export default class RFB extends EventTargetMixin {
         this._decoders[encodings.encodingTight] = new TightDecoder();
         this._decoders[encodings.encodingTightPNG] = new TightPNGDecoder();
         this._decoders[encodings.encodingZRLE] = new ZRLEDecoder();
-        this._decoders[encodings.encodingJPEG] = new JPEGDecoder();
+        
+        // JPEG decoder with frame rate limiting
+        this._frameRateLimiter = getFrameRateLimiter(30); // 30 FPS max
+        const baseJPEGDecoder = new JPEGDecoder();
+        this._decoders[encodings.encodingJPEG] = new ThrottledJPEGDecoder(
+            baseJPEGDecoder, 
+            this._frameRateLimiter
+        );
 
         // Initialize WASM decoder (async, will be ready later)
         this._wasmDecoder = null;
