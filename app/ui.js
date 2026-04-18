@@ -175,6 +175,8 @@ const UI = {
         UI.initSetting('decoder', 'js');
         UI.initSetting('fps', 60);
         UI.initSetting('transport', 'websocket');
+        UI.initSetting('upscaling', 'none');
+        UI.initSetting('gpu_render', false);
         UI.initSetting('shared', true);
         UI.initSetting('view_only', false);
         UI.initSetting('show_dot', false);
@@ -326,6 +328,22 @@ const UI = {
         if (recordBtn) {
             recordBtn.addEventListener('click', UI.toggleRecording);
         }
+
+        // Recorder panel buttons
+        const startBtn = document.getElementById("noVNC_recorder_start");
+        if (startBtn) {
+            startBtn.addEventListener('click', UI.startRecording);
+        }
+
+        const stopBtn = document.getElementById("noVNC_recorder_stop");
+        if (stopBtn) {
+            stopBtn.addEventListener('click', UI.stopRecording);
+        }
+
+        const downloadBtn = document.getElementById("noVNC_recorder_download");
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', UI.downloadRecording);
+        }
     },
 
     addConnectionControlHandlers() {
@@ -409,6 +427,10 @@ const UI = {
         UI.addSettingChangeHandler('logging', UI.updateLogging);
         UI.addSettingChangeHandler('reconnect');
         UI.addSettingChangeHandler('reconnect_delay');
+        UI.addSettingChangeHandler('upscaling');
+        UI.addSettingChangeHandler('upscaling', UI.updateUpscaling);
+        UI.addSettingChangeHandler('gpu_render');
+        UI.addSettingChangeHandler('gpu_render', UI.updateGPURendering);
     },
 
     addFullscreenHandlers() {
@@ -877,6 +899,7 @@ const UI = {
         UI.closeClipboardPanel();
         UI.closeAudioPanel();
         UI.closeNetworkPanel();
+        UI.closeRecorderPanel();
         UI.closeExtraKeys();
     },
 
@@ -1911,6 +1934,54 @@ const UI = {
         }
     },
 
+    async updateUpscaling() {
+        const algorithm = UI.getSetting('upscaling');
+        
+        if (!UI.upscaler) {
+            // Lazy load upscaler
+            const { getUpscaler } = await import('../core/upscaler.js');
+            UI.upscaler = getUpscaler();
+        }
+
+        await UI.upscaler.init(algorithm);
+        Log.Info(`Upscaling algorithm set to: ${algorithm}`);
+        
+        if (algorithm !== 'none') {
+            UI.showStatus(_("Upscaling enabled: ") + algorithm, 'normal', 2000);
+        }
+    },
+
+    async updateGPURendering() {
+        const enabled = UI.getSetting('gpu_render');
+        
+        if (enabled) {
+            if (!UI.gpuRenderer) {
+                // Lazy load GPU renderer
+                const { getGPURenderer } = await import('../core/gpu-renderer.js');
+                UI.gpuRenderer = getGPURenderer();
+            }
+
+            if (UI.rfb && UI.rfb._canvas) {
+                const success = await UI.gpuRenderer.init(UI.rfb._canvas);
+                if (success) {
+                    Log.Info('GPU rendering enabled');
+                    UI.showStatus(_("GPU rendering enabled"), 'normal', 2000);
+                } else {
+                    Log.Warn('Failed to enable GPU rendering');
+                    UI.showStatus(_("GPU rendering not supported"), 'warn', 3000);
+                    // Uncheck the setting
+                    document.getElementById('noVNC_setting_gpu_render').checked = false;
+                    UI.saveSetting('gpu_render');
+                }
+            }
+        } else {
+            if (UI.gpuRenderer) {
+                UI.gpuRenderer.destroy();
+                Log.Info('GPU rendering disabled');
+            }
+        }
+    },
+
 /* ------^-------
  *  /COMPRESSION
  * ==============
@@ -2350,8 +2421,185 @@ const UI = {
         };
         qualityEl.style.color = colors[stats.quality] || '#666';
     },
+
 /* ------^-------
- *   /EXTRA KEYS
+ *   /NETWORK
+ * ==============
+ *  SCREENSHOT & RECORDER
+ * ------v------*/
+
+    takeScreenshot() {
+        if (!UI.rfb) {
+            UI.showStatus(_("Not connected"), 'error');
+            return;
+        }
+
+        try {
+            // Get image data from display
+            const imageData = UI.rfb.getImageData();
+            
+            // Create canvas to convert to image
+            const canvas = document.createElement('canvas');
+            canvas.width = imageData.width;
+            canvas.height = imageData.height;
+            const ctx = canvas.getContext('2d');
+            ctx.putImageData(imageData, 0, 0);
+
+            // Convert to blob and download
+            canvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                a.href = url;
+                a.download = `vnc-screenshot-${timestamp}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                UI.showStatus(_("Screenshot saved"), 'normal', 2000);
+                Log.Info('Screenshot taken');
+            }, 'image/png');
+
+        } catch (err) {
+            Log.Error('Failed to take screenshot:', err);
+            UI.showStatus(_("Screenshot failed: ") + err.message, 'error');
+        }
+    },
+
+    toggleRecording() {
+        // Close other panels
+        UI.closeAllPanels();
+        // And open the recorder panel
+        UI.openRecorderPanel();
+    },
+
+    openRecorderPanel() {
+        UI.closeAllPanels();
+        UI.openControlbar();
+
+        document.getElementById('noVNC_recorder')
+            .classList.add("noVNC_open");
+        
+        // Update UI based on recording state
+        UI.updateRecorderUI();
+    },
+
+    closeRecorderPanel() {
+        document.getElementById('noVNC_recorder')
+            .classList.remove("noVNC_open");
+    },
+
+    updateRecorderUI() {
+        if (!UI.sessionRecorder) {
+            return;
+        }
+
+        const statusText = document.getElementById('noVNC_recorder_status_text');
+        const timeDiv = document.getElementById('noVNC_recorder_time');
+        const timeText = document.getElementById('noVNC_recorder_time_text');
+        const startBtn = document.getElementById('noVNC_recorder_start');
+        const stopBtn = document.getElementById('noVNC_recorder_stop');
+        const downloadBtn = document.getElementById('noVNC_recorder_download');
+        const recordBtn = document.getElementById('noVNC_record_button');
+
+        if (UI.sessionRecorder.isRecording) {
+            statusText.textContent = 'Recording...';
+            statusText.style.color = '#F44336';
+            timeDiv.style.display = 'block';
+            timeText.textContent = UI.sessionRecorder.getFormattedDuration();
+            startBtn.style.display = 'none';
+            stopBtn.style.display = 'inline-block';
+            downloadBtn.style.display = 'none';
+            if (recordBtn) recordBtn.classList.add('noVNC_selected');
+        } else if (UI.recordedBlob) {
+            statusText.textContent = 'Ready to download';
+            statusText.style.color = '#4CAF50';
+            timeDiv.style.display = 'none';
+            startBtn.style.display = 'inline-block';
+            stopBtn.style.display = 'none';
+            downloadBtn.style.display = 'inline-block';
+            if (recordBtn) recordBtn.classList.remove('noVNC_selected');
+        } else {
+            statusText.textContent = 'Ready';
+            statusText.style.color = '#666';
+            timeDiv.style.display = 'none';
+            startBtn.style.display = 'inline-block';
+            stopBtn.style.display = 'none';
+            downloadBtn.style.display = 'none';
+            if (recordBtn) recordBtn.classList.remove('noVNC_selected');
+        }
+    },
+
+    async startRecording() {
+        if (!UI.rfb || !UI.rfb._canvas) {
+            UI.showStatus(_("Not connected"), 'error');
+            return;
+        }
+
+        if (!UI.sessionRecorder) {
+            // Lazy load recorder
+            const { getSessionRecorder } = await import('../core/session-recorder.js');
+            UI.sessionRecorder = getSessionRecorder();
+        }
+
+        const success = await UI.sessionRecorder.startRecording(UI.rfb._canvas);
+        
+        if (success) {
+            UI.showStatus(_("Recording started"), 'normal', 2000);
+            UI.updateRecorderUI();
+            
+            // Update time display every second
+            UI.recorderInterval = setInterval(() => {
+                if (UI.sessionRecorder.isRecording) {
+                    const timeText = document.getElementById('noVNC_recorder_time_text');
+                    if (timeText) {
+                        timeText.textContent = UI.sessionRecorder.getFormattedDuration();
+                    }
+                }
+            }, 1000);
+        } else {
+            UI.showStatus(_("Failed to start recording"), 'error');
+        }
+    },
+
+    async stopRecording() {
+        if (!UI.sessionRecorder || !UI.sessionRecorder.isRecording) {
+            return;
+        }
+
+        const result = await UI.sessionRecorder.stopRecording();
+        
+        if (result) {
+            UI.recordedBlob = result.blob;
+            UI.showStatus(_("Recording stopped"), 'normal', 2000);
+            Log.Info(`Recording stopped: ${result.duration}ms, ${result.blob.size} bytes`);
+        }
+
+        if (UI.recorderInterval) {
+            clearInterval(UI.recorderInterval);
+            UI.recorderInterval = null;
+        }
+
+        UI.updateRecorderUI();
+    },
+
+    downloadRecording() {
+        if (!UI.recordedBlob || !UI.sessionRecorder) {
+            return;
+        }
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        UI.sessionRecorder.downloadRecording(UI.recordedBlob, `vnc-session-${timestamp}.webm`);
+        UI.showStatus(_("Recording downloaded"), 'normal', 2000);
+        
+        // Clear recorded blob
+        UI.recordedBlob = null;
+        UI.updateRecorderUI();
+    },
+
+/* ------^-------
+ *  /SCREENSHOT & RECORDER
  * ==============
  *     MISC
  * ------v------*/
